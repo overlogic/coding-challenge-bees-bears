@@ -85,3 +85,14 @@ class TestLoanOffer(TestCase, SharedTestMixin):
         response = await self.client.post("/loanoffers", json=data)
         self.assertEqual(response.status_code, 422)
 
+
+class TestLoanCalculator(TestCase):
+    def test_standard_case(self):
+        self.assertEqual(loan_calculator(10000, 5, 36), Decimal('299.71'))
+
+    def test_short_term(self):
+        self.assertEqual(loan_calculator(5000, 10, 12), Decimal('439.58'))
+
+    def test_large_amount(self):
+        self.assertEqual(loan_calculator(
+            1000000, 2.35, 14), Decimal('72482.13'))
