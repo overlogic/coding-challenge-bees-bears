@@ -3,6 +3,7 @@ from django.db import IntegrityError
 from ninja import NinjaAPI, Schema, ModelSchema, Router
 
 from loanapp.models import Customer, LoanOffer
+from loanapp.utils import loan_calculator
 
 
 api = NinjaAPI()
@@ -25,6 +26,12 @@ class LoanOfferCreateSchema(Schema):
     customer_id: int
     loan_amount: float
     interest_rate: float
+    loan_term: int
+
+
+class LoanCalculateSchema(Schema):
+    loan_amount: float
+    interest: float
     loan_term: int
 
 
@@ -62,5 +69,11 @@ async def create_loan_offer(request, loan_offer: LoanOfferCreateSchema):
         term=loan_offer.loan_term,
     )
     return {"id": loan_offer.id}
+
+
+@router.post("/calculateloan")
+async def get_loan_estimate(request, loan_calc: LoanCalculateSchema):
+    return {"amount": loan_calculator(loan_calc.loan_amount, loan_calc.interest, loan_calc.loan_term)}
+
 
 api.add_router("", router)

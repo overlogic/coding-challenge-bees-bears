@@ -12,7 +12,9 @@ INSTALLED_APPS = [
     'loanapp',
 ]
 
-MIDDLEWARE = []
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+]
 
 ROOT_URLCONF = 'core.urls'
 
@@ -34,3 +36,5 @@ USE_I18N = False
 USE_TZ = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CORS_ORIGIN_ALLOW_ALL = True
