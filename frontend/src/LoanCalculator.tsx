@@ -4,30 +4,26 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 const loanSchema = z.object({
-  loan_amount: z.coerce.number().refine((num) => num > 0, { message: "Must be a positive number" }),
-  interest: z.coerce.number().refine((num) => num > 0, { message: "Must be a positive number" }),
-  loan_term: z.coerce
-    .number()
-    .refine((num) => num > 0, { message: "Must be a positive integer" })
-    .refine((num) => Number.isInteger(num), { message: "Must be an integer" }),
+  loan_amount: z.coerce.number().positive("Must be a positive number"),
+  interest_rate: z.coerce.number().positive("Must be a positive number"),
+  loan_term: z.coerce.number().positive("Must be a positive integer").int("Must be an integer"),
 });
 
 type LoanSchemaType = z.infer<typeof loanSchema>;
-
-type CalcResult = { success: true; result: number } | { success: false; error: string };
 
 export const LoanCalculator: React.FC = () => {
   const {
     register,
     handleSubmit,
+    setError,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isSubmitSuccessful },
   } = useForm<LoanSchemaType>({ resolver: zodResolver(loanSchema) });
 
-  const [result, setResult] = React.useState<CalcResult | undefined>();
+  const [loanAmount, setloanAmount] = React.useState<number | undefined>();
 
   const onReset = () => {
-    setResult(undefined);
+    setloanAmount(undefined);
     reset();
   };
 
@@ -39,13 +35,21 @@ export const LoanCalculator: React.FC = () => {
         body: JSON.stringify(data),
       });
       if (!response.ok) {
-        setResult({ success: false, error: response.statusText });
+        setError("root.serverError", {
+          type: response.status.toString(),
+          message: "Service is unavailable. Try again later.",
+        });
         return;
       }
-      const result: { amount: number } = await response.json();
-      setResult({ success: true, result: result.amount });
+
+      const result = z.object({ payment: z.coerce.number() }).parse(await response.json());
+      setloanAmount(result.payment);
     } catch (err: any) {
-      setResult({ success: false, error: err.message });
+      console.log(err.name);
+      setError("root.serverError", {
+        type: "500",
+        message: err.name === "ZodError" ? "Unknown server response" : err.message,
+      });
     }
   };
 
@@ -73,7 +77,7 @@ export const LoanCalculator: React.FC = () => {
           </div>
 
           <div className="sm:col-span-2">
-            <label htmlFor="interest" className="block text-sm font-medium leading-6 text-gray-900">
+            <label htmlFor="interest_rate" className="block text-sm font-medium leading-6 text-gray-900">
               Interest rate
             </label>
             <div className="relative mt-2 rounded-md shadow-sm">
@@ -82,13 +86,13 @@ export const LoanCalculator: React.FC = () => {
               </div>
               <input
                 className="block w-full rounded-md border-0 py-1.5 pl-7 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                id="interest"
+                id="interest_rate"
                 type="number"
                 placeholder="0.00"
-                {...register("interest")}
+                {...register("interest_rate")}
               />
             </div>
-            {errors.interest && <p className="text-red-600 sm:text-sm mt-2">{errors.interest.message}</p>}
+            {errors.interest_rate && <p className="text-red-600 sm:text-sm mt-2">{errors.interest_rate.message}</p>}
           </div>
 
           <div className="sm:col-span-2">
@@ -109,13 +113,12 @@ export const LoanCalculator: React.FC = () => {
         </div>
 
         <div className="mt-8">
-          {result && result.success ? (
+          {isSubmitSuccessful && loanAmount && (
             <div className="pb-2">
-              Your monthly payment will be <span className="font-semibold">{result.result}€</span>
+              Your monthly payment will be <span className="font-semibold">{loanAmount}€</span>
             </div>
-          ) : (
-            result && <div className="pb-2 text-red-600">Service is unavailable. Try again later.</div>
           )}
+          {errors.root?.serverError && <div className="pb-2 text-red-600">{errors.root.serverError.message}</div>}
         </div>
       </div>
 

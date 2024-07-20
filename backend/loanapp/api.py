@@ -1,3 +1,4 @@
+from decimal import InvalidOperation
 from django.shortcuts import aget_object_or_404
 from django.db import IntegrityError
 from ninja import NinjaAPI, Schema, ModelSchema, Router
@@ -31,7 +32,7 @@ class LoanOfferCreateSchema(Schema):
 
 class LoanCalculateSchema(Schema):
     loan_amount: float
-    interest: float
+    interest_rate: float
     loan_term: int
 
 
@@ -52,6 +53,10 @@ async def get_customer(request, id: int):
 
 @router.post("/loanoffers")
 async def create_loan_offer(request, loan_offer: LoanOfferCreateSchema):
+    for field in ['loan_amount', 'interest_rate', 'loan_term']:
+        if loan_offer.dict()[field] < 0:
+            return api.create_response(
+                request, {"detail": f"{field} cannot be negative"}, status=422)
     cid = loan_offer.customer_id
     try:
         customer = await Customer.objects.aget(id=cid)
@@ -73,7 +78,14 @@ async def create_loan_offer(request, loan_offer: LoanOfferCreateSchema):
 
 @router.post("/calculateloan")
 async def get_loan_estimate(request, loan_calc: LoanCalculateSchema):
-    return {"amount": loan_calculator(loan_calc.loan_amount, loan_calc.interest, loan_calc.loan_term)}
-
+    for field in ['loan_amount', 'interest_rate', 'loan_term']:
+        if loan_calc.dict()[field] < 0:
+            return api.create_response(
+                request, {"detail": f"{field} cannot be negative"}, status=422)
+    try:
+        return {"payment": loan_calculator(loan_calc.loan_amount, loan_calc.interest_rate, loan_calc.loan_term)}
+    except InvalidOperation:
+        return api.create_response(
+            request, {"detail": "Invalid input"}, status=422)
 
 api.add_router("", router)

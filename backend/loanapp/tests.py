@@ -50,7 +50,6 @@ class TestCustomer(TestCase, SharedTestMixin):
             "email": "john.doe@example.com"
         }
         response = await self.client.post("/customers", json=data)
-        assert response.status_code == 200
         self.assertEqual(response.status_code, 200)
 
         response = await self.client.post("/customers", json=data)
@@ -71,9 +70,41 @@ class TestLoanOffer(TestCase, SharedTestMixin):
             "loan_term": 36
         }
         response = await self.client.post("/loanoffers", json=data)
-        assert response.status_code == 200
         self.assertEqual(response.status_code, 200)
         self.assertIn('id', response.json())
+
+    async def test_create_loan_offer_negative_amount(self):
+        customer = await self.create_customer("Alice", "Smith", "alice.smith@example.com")
+        data = {
+            "customer_id": customer.id,
+            "loan_amount": -12,
+            "interest_rate": 5.5,
+            "loan_term": 36
+        }
+        response = await self.client.post("/loanoffers", json=data)
+        self.assertEqual(response.status_code, 422)
+
+    async def test_create_loan_offer_negative_interest(self):
+        customer = await self.create_customer("Alice", "Smith", "alice.smith@example.com")
+        data = {
+            "customer_id": customer.id,
+            "loan_amount": 12,
+            "interest_rate": -5.5,
+            "loan_term": 36
+        }
+        response = await self.client.post("/loanoffers", json=data)
+        self.assertEqual(response.status_code, 422)
+
+    async def test_create_loan_offer_negative_term(self):
+        customer = await self.create_customer("Alice", "Smith", "alice.smith@example.com")
+        data = {
+            "customer_id": customer.id,
+            "loan_amount": 12,
+            "interest_rate": 5.5,
+            "loan_term": -36
+        }
+        response = await self.client.post("/loanoffers", json=data)
+        self.assertEqual(response.status_code, 422)
 
     async def test_create_loan_offer_customer_not_exist(self):
         data = {
@@ -96,3 +127,27 @@ class TestLoanCalculator(TestCase):
     def test_large_amount(self):
         self.assertEqual(loan_calculator(
             1000000, 2.35, 14), Decimal('72482.13'))
+
+class TestLoanCalculatorEndpoint(TestCase):
+
+    def setUp(self):
+        self.client = TestAsyncClient(router)
+
+    async def test_zero_values(self):
+        data = {
+            "loan_amount": 0,
+            "interest_rate": 0,
+            "loan_term": 0,
+        }
+        response = await self.client.post("/calculateloan", json=data)
+        self.assertEqual(response.status_code, 422)
+
+
+    async def test_positive_values(self):
+        data = {
+            "loan_amount": 1,
+            "interest_rate": 1,
+            "loan_term": 1,
+        }
+        response = await self.client.post("/calculateloan", json=data)
+        self.assertEqual(response.status_code, 200)
